@@ -101,12 +101,13 @@ void chip8_init(){
     }
 }
 
-void loadProgram(){
+void loadProgram(char * fileName){
     // programs should be loaded at 0x200 (512)
     // simply copy the 'ROM' to that location
+    chip8_init();
     
     File ch8File;
-    if(ch8File.openRO("/chip8/blinky")){
+    if(ch8File.openRO(fileName)){
         int fileSize = ch8File.size();
         // check if fileSize + 512 > 4095
         
@@ -165,19 +166,17 @@ void lcdTile(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t* gfx, int 
     cmd(0x22);
     int i=0;
     for (int y=0; y<height; y++) {
-        for(int x=0; x<width; x++){
-            dat(gfx[i]); dat(gfx[i]); dat(gfx[i++]);
+        for(int w=0; w<scale; w++){
+            for(int x=0; x<width; x++){
+                for(int z = 0; z<scale; z++){
+                    dat(gfx[i]);
+                }
+                i++;
+            }
+            i-=width;
         }
-        i-=width;
-        for(int x=0; x<width; x++){
-            dat(gfx[i]); dat(gfx[i]); dat(gfx[i++]);
-        }
-        i-=width;
-        for(int x=0; x<width; x++){
-            dat(gfx[i]); dat(gfx[i]); dat(gfx[i++]);
-        }
+        i+=width;
     }
-    //setWindow(0, 0, 220, 176);
 }
 
 
@@ -188,7 +187,9 @@ void directSprite(int x, int y, int h){
     // get bg from x,y,8,h
     int i=0;
     int width = 8;
-    while(x+width>63)width--;
+    while(x+width>64)width--;
+
+    if(y+h > 32) h=y-32;
 
     auto ts = &tempSprite[0];
     for(int y1=0; y1<h; y1++){
@@ -207,7 +208,7 @@ void directScreen(int scale){
     for (int x=0; x<numPix; x++) {
         dat(0);
     }
-    setWindow(0, 0, 219, 175);
+    setWindow(0, 0, 220, 176);
 }
 
 
@@ -242,8 +243,8 @@ void chip8_emuCycle(){
                         shouldRender = true;
                     }else if(N==0xE){
                         //Return from subroutine...
-                        stackPointer--;
-                        programCounter = stack[stackPointer];
+                        //stackPointer--;
+                        programCounter = stack[--stackPointer];
                     }
                 }
             }
@@ -254,8 +255,8 @@ void chip8_emuCycle(){
         break;
 
         case 0x2: // Call routine at NNN
-            stack[stackPointer] = programCounter;
-            stackPointer++;
+            stack[stackPointer++] = programCounter;
+            //stackPointer++;
             programCounter = NNN;
         break;
 
@@ -409,9 +410,12 @@ void chip8_emuCycle(){
                 I = V[X] * 5; // 5 bytes per character
             }else
             if(NN==0x33){ // FX33 = I = BCD(V[X]) Binary Coded Decimal
-                memory[I] = V[X]/100;
-                memory[I+1] = V[X]%10;
-                memory[I+2] = V[X]/10;
+                uint8_t digit = V[X];
+                memory[I+2] = digit % 10;
+                digit /=10;
+                memory[I+1] = digit % 10;
+                digit /=10;
+                memory[I] = digit % 10;
             }else
             if(NN==0x55){ // FX55 = mem copy V[0]-V[X] to I to I+X
                 for(int t=0; t<X+1; t++){
@@ -453,5 +457,6 @@ void chip8_updateKeys(){
     if(DBtn){ key[8] = 1; }
     if(ABtn){ key[5] = 1; }
     if(BBtn){ key[5] = 1; }
+
 }
 
